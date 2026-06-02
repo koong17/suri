@@ -41,7 +41,15 @@ struct SlackClient: WorkItemProvider {
             $0.isWithinLookback(configuration.lookbackHours ?? 72)
         }
         let tasks = matches.map { message in
-            AssistantTask(
+            var metadata = [
+                MetadataItem(label: "채널", value: message.channel?.name ?? message.channel?.id ?? "알 수 없음"),
+                MetadataItem(label: "링크", value: message.permalink ?? "없음")
+            ]
+            if message.isDirectMessage {
+                metadata.insert(MetadataItem(label: "분류", value: "DM"), at: 1)
+            }
+
+            return AssistantTask(
                 title: message.title,
                 source: .slack,
                 dueDate: TaskExtractor.inferredDueDate(from: message.text, relativeTo: message.timestampDate ?? .now),
@@ -51,19 +59,17 @@ struct SlackClient: WorkItemProvider {
                 owner: message.username ?? message.user ?? "Slack",
                 requiresUserReview: TaskExtractor.requiresReview(from: message.text),
                 recommendedAction: "메시지 내용을 확인하고 필요한 답변 또는 일정 조정을 진행",
-                metadata: [
-                    MetadataItem(label: "채널", value: message.channel?.name ?? message.channel?.id ?? "알 수 없음"),
-                    MetadataItem(label: "링크", value: message.permalink ?? "없음")
-                ]
+                metadata: metadata
             )
         }
+        let groupedTasks = SlackDirectMessageTaskGrouper().grouped(tasks)
 
         return ProviderSnapshot(
-            tasks: tasks,
+            tasks: groupedTasks,
             connection: SourceConnection(
                 source: .slack,
                 isConnected: true,
-                unreadCount: tasks.count,
+                unreadCount: groupedTasks.count,
                 lastActivity: .now,
                 summary: "Slack 검색 결과에서 확인/일정 후보를 가져왔습니다."
             )
@@ -100,6 +106,10 @@ private struct SlackMessage: Decodable {
 
     var timestampDate: Date? {
         SlackDateParser.date(from: ts)
+    }
+
+    var isDirectMessage: Bool {
+        channel?.id?.hasPrefix("D") == true
     }
 
     func isWithinLookback(_ lookbackHours: Double) -> Bool {

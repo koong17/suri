@@ -122,7 +122,7 @@ extension AssistantTask {
 
     private var stableMetadataValue: String? {
         metadata.first {
-            ["링크", "URL", "MR", "PR", "Issue", "이슈", "파일", "메모"].contains($0.label)
+            ["대화", "링크", "URL", "MR", "PR", "Issue", "이슈", "파일", "메모"].contains($0.label)
         }?.value
     }
 }
