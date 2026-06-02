@@ -9,7 +9,6 @@ enum LayoutMetrics {
     static let sidebarMaxWidth: CGFloat = 300
 
     static let detailMinWidth: CGFloat = 340
-    static let detailLeadingGutterWhenInspectorIsOpen: CGFloat = 16
 
     static let inspectorWidth: CGFloat = 340
 }

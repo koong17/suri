@@ -76,7 +76,6 @@ struct ContentView: View {
                     showInspector: $showInspector
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.leading, showInspector ? LayoutMetrics.detailLeadingGutterWhenInspectorIsOpen : 0)
 
                 InlineInspectorColumn(isPresented: showInspector) {
                     InspectorView(
