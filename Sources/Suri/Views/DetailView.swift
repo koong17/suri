@@ -31,7 +31,11 @@ struct DetailView: View {
             Divider()
 
             if section == .sources {
-                SourcesDetailView(sources: sources)
+                SourcesDetailView(
+                    sources: sources,
+                    tasks: tasks,
+                    selectedTaskID: $selectedTaskID
+                )
             } else if section == .notes {
                 NotesDetailView(notes: notes, tasks: tasks, selectedTaskID: $selectedTaskID)
             } else {
@@ -301,39 +305,63 @@ private struct TaskRow: View {
 
 private struct SourcesDetailView: View {
     let sources: [SourceConnection]
+    let tasks: [AssistantTask]
+    @Binding var selectedTaskID: AssistantTask.ID?
 
     var body: some View {
-        List(sources) { connection in
-            HStack(spacing: 12) {
-                Image(systemName: connection.source.systemImage)
-                    .foregroundStyle(connection.source.accent)
-                    .frame(width: 24)
+        List(selection: $selectedTaskID) {
+            ForEach(sources) { connection in
+                Section {
+                    sourceStatusRow(connection)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(connection.source.title)
-                        .font(.headline)
-                    Text(connection.summary)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    Label(connection.health.title, systemImage: connection.health.systemImage)
-                        .foregroundStyle(connection.health.tint)
-                    Text("\(connection.unreadCount)개 새 항목")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if connection.duplicateCount > 0 {
-                        Text("중복 \(connection.duplicateCount)개 정리")
-                            .font(.caption2)
+                    let sourceTasks = tasks.filter { $0.source == connection.source }
+                    if sourceTasks.isEmpty {
+                        Text("표시할 항목 없음")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(sourceTasks) { task in
+                            TaskRow(task: task)
+                                .tag(task.id as AssistantTask.ID?)
+                        }
                     }
+                } header: {
+                    Label(connection.source.title, systemImage: connection.source.systemImage)
                 }
             }
-            .padding(.vertical, 8)
         }
+    }
+
+    private func sourceStatusRow(_ connection: SourceConnection) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: connection.source.systemImage)
+                .foregroundStyle(connection.source.accent)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(connection.source.title)
+                    .font(.headline)
+                Text(connection.summary)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Label(connection.health.title, systemImage: connection.health.systemImage)
+                    .foregroundStyle(connection.health.tint)
+                Text("\(connection.unreadCount)개 새 항목")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if connection.duplicateCount > 0 {
+                    Text("중복 \(connection.duplicateCount)개 정리")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 8)
     }
 }
 

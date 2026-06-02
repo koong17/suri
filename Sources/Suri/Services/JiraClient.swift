@@ -38,13 +38,13 @@ struct JiraClient: WorkItemProvider {
             return AssistantTask(
                 title: summary,
                 source: .jira,
-                dueDate: issue.fields.dueDate ?? TaskExtractor.inferredDueDate(from: summary, fallbackHours: 72),
+                dueDate: issue.fields.dueDate ?? TaskExtractor.inferredDueDate(from: summary),
                 priority: issue.fields.priority.taskPriority,
-                status: .scheduled,
+                status: .open,
                 context: context,
                 owner: issue.fields.assignee?.displayName ?? "나",
-                requiresUserReview: TaskExtractor.requiresReview(from: summary),
-                recommendedAction: "Jira 이슈 상태와 남은 blocker를 확인",
+                requiresUserReview: true,
+                recommendedAction: "진행 상태와 남은 blocker를 확인하고 필요한 업데이트를 남기기",
                 metadata: [
                     MetadataItem(label: "이슈", value: issue.key),
                     MetadataItem(label: "상태", value: issue.fields.status?.name ?? "알 수 없음"),
