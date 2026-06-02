@@ -211,7 +211,7 @@ private struct InlineInspectorColumn<Content: View>: View {
             content
                 .frame(width: LayoutMetrics.inspectorWidth)
                 .frame(maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(Color(nsColor: .controlBackgroundColor))
         }
         .frame(width: isPresented ? LayoutMetrics.inspectorWidth + 1 : 0, alignment: .trailing)
         .frame(maxHeight: .infinity)
