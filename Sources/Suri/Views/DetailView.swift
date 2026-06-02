@@ -279,12 +279,9 @@ private struct TaskRow: View {
                     .foregroundStyle(task.source.accent)
 
                 if task.isActiveJiraIssue {
-                    Label("진행 중", systemImage: "play.circle.fill")
-                        .font(.caption.weight(.semibold))
+                    Text("진행 중")
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.indigo)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(.indigo.opacity(0.12), in: Capsule())
                 }
 
                 Spacer()
@@ -335,22 +332,10 @@ private struct TaskRow: View {
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
         .background(selectionBackground, in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(rowBorder, lineWidth: task.isActiveJiraIssue ? 1 : 0)
-        }
     }
 
     private var selectionBackground: Color {
-        if isSelected {
-            return Color.primary.opacity(0.08)
-        }
-
-        return task.isActiveJiraIssue ? Color.indigo.opacity(0.07) : Color.clear
-    }
-
-    private var rowBorder: Color {
-        task.isActiveJiraIssue ? Color.indigo.opacity(0.30) : Color.clear
+        isSelected ? Color.primary.opacity(0.08) : Color.clear
     }
 
     private var priorityStyle: AnyShapeStyle {
