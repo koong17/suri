@@ -102,7 +102,7 @@ Example:
     "baseURL": "https://your-domain.atlassian.net",
     "email": "you@example.com",
     "apiToken": "your-api-token",
-    "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC"
+    "jql": "(assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR watcher = currentUser()) AND statusCategory != Done ORDER BY updated DESC"
   },
   "email": {
     "enabled": false,
@@ -171,6 +171,18 @@ Set `repos` to narrow the search:
 ```
 
 If `token` is present, Suri passes it only to the `gh` subprocess as `GH_TOKEN` and `GITHUB_TOKEN`. Leaving it empty keeps authentication in GitHub CLI.
+
+## Jira
+
+Suri validates Jira credentials with `/rest/api/3/myself` before running JQL. If the email/API token pair is invalid, the Jira source is marked disconnected instead of showing a misleading healthy empty result.
+
+The default JQL tracks open work where the authenticated user is assigned, reporting, creating, or watching:
+
+```jql
+(assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR watcher = currentUser()) AND statusCategory != Done ORDER BY updated DESC
+```
+
+Use a narrower `jql` value in `integrations.json` if you only want assigned issues.
 
 ## Cache And Sync
 

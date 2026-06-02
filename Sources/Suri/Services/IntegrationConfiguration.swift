@@ -72,7 +72,7 @@ struct IntegrationConfiguration: Codable {
         "baseURL": "https://your-domain.atlassian.net",
         "email": "you@example.com",
         "apiToken": "your-api-token",
-        "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY duedate ASC"
+        "jql": "(assignee = currentUser() OR reporter = currentUser() OR creator = currentUser() OR watcher = currentUser()) AND statusCategory != Done ORDER BY updated DESC"
       },
       "email": {
         "enabled": false,
