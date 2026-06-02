@@ -11,8 +11,5 @@ enum LayoutMetrics {
     static let detailMinWidth: CGFloat = 340
     static let detailLeadingGutterWhenInspectorIsOpen: CGFloat = 16
 
-    static let inspectorDefaultWidth = 340.0
-    static let inspectorMinWidth = 280.0
-    static let inspectorMaxWidth = 480.0
-    static let inspectorResizeHandleWidth: CGFloat = 16
+    static let inspectorWidth: CGFloat = 340
 }
