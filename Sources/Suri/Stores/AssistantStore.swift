@@ -8,10 +8,12 @@ final class AssistantStore {
     @ObservationIgnored private let syncService: AssistantSyncService
     @ObservationIgnored private let notificationScheduler: NotificationScheduler
     @ObservationIgnored private let cacheStore: AssistantCacheStore
+    @ObservationIgnored private let localNoteStore: LocalNoteStore
 
     var tasks: [AssistantTask]
     var sources: [SourceConnection]
     var notes: [AssistantNote]
+    var editableNoteIDs: Set<AssistantNote.ID> = []
     var lastSyncedAt: Date
     var isSyncing = false
     var lastSyncError: String?
@@ -31,6 +33,7 @@ final class AssistantStore {
         self.syncService = AssistantSyncService()
         self.notificationScheduler = NotificationScheduler()
         self.cacheStore = AssistantCacheStore()
+        self.localNoteStore = LocalNoteStore()
     }
 
     func sidebarSummaries(dueSoonHours: Double) -> [SidebarSummary] {
@@ -78,6 +81,7 @@ final class AssistantStore {
             }
 
             apply(cachedResult)
+            mergeLocalNotes()
             hasCachedSnapshot = true
             lastSyncError = cachedResult.providerErrors.isEmpty ? nil : cachedResult.providerErrors.joined(separator: "\n")
         } catch {
@@ -144,6 +148,67 @@ final class AssistantStore {
             ]
         )
         tasks.insert(reminder, at: 0)
+    }
+
+    @discardableResult
+    func createNote(title: String = "새 메모", body: String = "") -> AssistantNote? {
+        let note = AssistantNote(
+            title: title.nilIfEmpty ?? "새 메모",
+            body: body,
+            capturedAt: .now,
+            linkedTaskID: nil
+        )
+        do {
+            var localNotes = try localNoteStore.load()
+            localNotes.insert(note, at: 0)
+            try localNoteStore.save(localNotes)
+            editableNoteIDs.insert(note.id)
+            notes.insert(note, at: 0)
+            return note
+        } catch {
+            lastSyncError = "메모 저장 실패: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    func updateNote(_ note: AssistantNote) {
+        guard editableNoteIDs.contains(note.id) else {
+            return
+        }
+
+        do {
+            var localNotes = try localNoteStore.load()
+            guard let index = localNotes.firstIndex(where: { $0.id == note.id }) else {
+                return
+            }
+            var updatedNote = note
+            updatedNote.capturedAt = .now
+            localNotes[index] = updatedNote
+            try localNoteStore.save(localNotes)
+
+            if let noteIndex = notes.firstIndex(where: { $0.id == note.id }) {
+                notes[noteIndex] = updatedNote
+            }
+            notes = notes.sortedByCapturedDateDescending()
+        } catch {
+            lastSyncError = "메모 수정 실패: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteNote(_ id: AssistantNote.ID) {
+        guard editableNoteIDs.contains(id) else {
+            return
+        }
+
+        do {
+            var localNotes = try localNoteStore.load()
+            localNotes.removeAll { $0.id == id }
+            try localNoteStore.save(localNotes)
+            editableNoteIDs.remove(id)
+            notes.removeAll { $0.id == id }
+        } catch {
+            lastSyncError = "메모 삭제 실패: \(error.localizedDescription)"
+        }
     }
 
     func markReviewed(_ id: AssistantTask.ID?) {
@@ -232,9 +297,29 @@ final class AssistantStore {
     private func apply(_ result: AssistantSyncResult) {
         tasks = applyingReviewedState(to: result.tasks)
         sources = result.sources
-        notes = result.notes
+        notes = mergingLocalNotes(with: result.notes)
         lastSyncedAt = result.syncedAt
         isUsingFallbackData = result.usedFallback
+    }
+
+    private func mergeLocalNotes() {
+        notes = mergingLocalNotes(with: notes)
+    }
+
+    private func mergingLocalNotes(with externalNotes: [AssistantNote]) -> [AssistantNote] {
+        do {
+            let localNotes = try localNoteStore.load()
+            editableNoteIDs = Set(localNotes.map(\.id))
+            let localIDs = Set(localNotes.map(\.id))
+            return (localNotes + externalNotes.filter { !localIDs.contains($0.id) })
+                .sortedByCapturedDateDescending()
+        } catch {
+            lastSyncError = [lastSyncError, "메모 로드 실패: \(error.localizedDescription)"]
+                .compactMap { $0 }
+                .joined(separator: "\n")
+            editableNoteIDs = []
+            return externalNotes.sortedByCapturedDateDescending()
+        }
     }
 
     private func saveCacheIfUseful(_ result: AssistantSyncResult) {

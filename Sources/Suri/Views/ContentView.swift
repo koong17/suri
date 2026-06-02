@@ -59,6 +59,7 @@ struct ContentView: View {
                 tasks: filteredTasks,
                 sources: store.sources,
                 notes: store.notes,
+                editableNoteIDs: store.editableNoteIDs,
                 lastSyncedAt: store.lastSyncedAt,
                 dueSoonHours: dueSoonHours,
                 isSyncing: store.isSyncing,
@@ -67,6 +68,9 @@ struct ContentView: View {
                 selectedTaskID: selectedTaskBinding,
                 onSync: syncNow,
                 onCreateReminder: store.createReminder,
+                onCreateNote: { title, body in store.createNote(title: title, body: body) },
+                onUpdateNote: store.updateNote,
+                onDeleteNote: store.deleteNote,
                 onMarkReviewed: { store.markReviewed(selectedTaskID) },
                 showInspector: $showInspector
             )
@@ -83,6 +87,7 @@ struct ContentView: View {
             }
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "검색")
+        .navigationSplitViewStyle(.balanced)
         .focusedValue(\.assistantCommandHandlers, commandHandlers)
         .task {
             guard !didRunInitialSync else {

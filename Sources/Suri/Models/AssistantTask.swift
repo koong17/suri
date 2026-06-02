@@ -32,6 +32,13 @@ struct AssistantTask: Identifiable, Hashable, Codable {
             && metadata.contains { $0.label == "분류" && $0.value.contains("중요") }
     }
 
+    var primaryURL: URL? {
+        metadata
+            .filter { ["링크", "URL", "MR", "PR", "Issue", "이슈"].contains($0.label) }
+            .compactMap { URL(string: $0.value) }
+            .first { $0.scheme != nil }
+    }
+
     init(
         id: UUID = UUID(),
         title: String,

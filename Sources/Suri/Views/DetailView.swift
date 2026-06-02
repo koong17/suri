@@ -5,6 +5,7 @@ struct DetailView: View {
     let tasks: [AssistantTask]
     let sources: [SourceConnection]
     let notes: [AssistantNote]
+    let editableNoteIDs: Set<AssistantNote.ID>
     let lastSyncedAt: Date
     let dueSoonHours: Double
     let isSyncing: Bool
@@ -13,6 +14,9 @@ struct DetailView: View {
     @Binding var selectedTaskID: AssistantTask.ID?
     let onSync: () -> Void
     let onCreateReminder: () -> Void
+    let onCreateNote: (String, String) -> AssistantNote?
+    let onUpdateNote: (AssistantNote) -> Void
+    let onDeleteNote: (AssistantNote.ID) -> Void
     let onMarkReviewed: () -> Void
     @Binding var showInspector: Bool
 
@@ -37,7 +41,15 @@ struct DetailView: View {
                     selectedTaskID: $selectedTaskID
                 )
             } else if section == .notes {
-                NotesDetailView(notes: notes, tasks: tasks, selectedTaskID: $selectedTaskID)
+                NotesDetailView(
+                    notes: notes,
+                    editableNoteIDs: editableNoteIDs,
+                    tasks: tasks,
+                    selectedTaskID: $selectedTaskID,
+                    onCreateNote: onCreateNote,
+                    onUpdateNote: onUpdateNote,
+                    onDeleteNote: onDeleteNote
+                )
             } else {
                 TaskListView(tasks: tasks, selectedTaskID: $selectedTaskID)
             }
@@ -233,10 +245,13 @@ private struct TaskListView: View {
     @Binding var selectedTaskID: AssistantTask.ID?
 
     var body: some View {
-        List(selection: $selectedTaskID) {
+        List {
             ForEach(tasks) { task in
-                TaskRow(task: task)
-                    .tag(task.id as AssistantTask.ID?)
+                SelectableTaskRow(
+                    task: task,
+                    isSelected: selectedTaskID == task.id,
+                    onSelect: { selectedTaskID = task.id }
+                )
             }
         }
         .overlay {
@@ -253,6 +268,7 @@ private struct TaskListView: View {
 
 private struct TaskRow: View {
     let task: AssistantTask
+    let isSelected: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -268,11 +284,28 @@ private struct TaskRow: View {
                     .foregroundStyle(priorityStyle)
             }
 
-            Text(task.title)
+            if let url = task.primaryURL {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Text(task.title)
+                            .lineLimit(2)
+                        Image(systemName: "arrow.up.forward.square")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 .font(.headline)
-                .lineLimit(2)
+                .buttonStyle(.plain)
                 .strikethrough(task.status == .reviewed)
                 .foregroundStyle(task.status == .reviewed ? .secondary : .primary)
+                .help(url.absoluteString)
+            } else {
+                Text(task.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .strikethrough(task.status == .reviewed)
+                    .foregroundStyle(task.status == .reviewed ? .secondary : .primary)
+            }
 
             Text(task.context)
                 .foregroundStyle(.secondary)
@@ -289,6 +322,13 @@ private struct TaskRow: View {
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .background(selectionBackground, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var selectionBackground: Color {
+        isSelected ? Color.primary.opacity(0.08) : Color.clear
     }
 
     private var priorityStyle: AnyShapeStyle {
@@ -303,13 +343,25 @@ private struct TaskRow: View {
     }
 }
 
+private struct SelectableTaskRow: View {
+    let task: AssistantTask
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        TaskRow(task: task, isSelected: isSelected)
+            .onTapGesture(perform: onSelect)
+            .listRowBackground(Color.clear)
+    }
+}
+
 private struct SourcesDetailView: View {
     let sources: [SourceConnection]
     let tasks: [AssistantTask]
     @Binding var selectedTaskID: AssistantTask.ID?
 
     var body: some View {
-        List(selection: $selectedTaskID) {
+        List {
             ForEach(sources) { connection in
                 Section {
                     sourceStatusRow(connection)
@@ -321,8 +373,11 @@ private struct SourcesDetailView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(sourceTasks) { task in
-                            TaskRow(task: task)
-                                .tag(task.id as AssistantTask.ID?)
+                            SelectableTaskRow(
+                                task: task,
+                                isSelected: selectedTaskID == task.id,
+                                onSelect: { selectedTaskID = task.id }
+                            )
                         }
                     }
                 } header: {
@@ -367,35 +422,161 @@ private struct SourcesDetailView: View {
 
 private struct NotesDetailView: View {
     let notes: [AssistantNote]
+    let editableNoteIDs: Set<AssistantNote.ID>
     let tasks: [AssistantTask]
     @Binding var selectedTaskID: AssistantTask.ID?
+    let onCreateNote: (String, String) -> AssistantNote?
+    let onUpdateNote: (AssistantNote) -> Void
+    let onDeleteNote: (AssistantNote.ID) -> Void
+    @State private var noteDraft = NoteDraft()
+    @State private var isShowingNoteEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
-            List(selection: $selectedTaskID) {
+            HStack {
+                Button {
+                    noteDraft = NoteDraft()
+                    isShowingNoteEditor = true
+                } label: {
+                    Label("메모 추가", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+            .padding([.top, .horizontal])
+
+            List {
                 Section("메모에서 추출한 작업") {
                     ForEach(tasks) { task in
-                        TaskRow(task: task)
-                            .tag(task.id as AssistantTask.ID?)
+                        SelectableTaskRow(
+                            task: task,
+                            isSelected: selectedTaskID == task.id,
+                            onSelect: { selectedTaskID = task.id }
+                        )
                     }
                 }
 
                 Section("최근 메모") {
                     ForEach(notes) { note in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(note.title)
-                                .font(.headline)
-                            Text(note.body)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                            Text(AssistantFormatters.relative.localizedString(for: note.capturedAt, relativeTo: .now))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.vertical, 6)
+                        noteRow(note)
                     }
                 }
             }
         }
+        .sheet(isPresented: $isShowingNoteEditor) {
+            NoteEditorSheet(draft: $noteDraft) { draft in
+                save(draft)
+                isShowingNoteEditor = false
+            } onCancel: {
+                isShowingNoteEditor = false
+            }
+        }
+    }
+
+    private func noteRow(_ note: AssistantNote) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(note.title)
+                    .font(.headline)
+                Text(note.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text(AssistantFormatters.relative.localizedString(for: note.capturedAt, relativeTo: .now))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            if editableNoteIDs.contains(note.id) {
+                HStack(spacing: 6) {
+                    Button {
+                        noteDraft = NoteDraft(note: note)
+                        isShowingNoteEditor = true
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("메모 편집")
+
+                    Button(role: .destructive) {
+                        onDeleteNote(note.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("메모 삭제")
+                }
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func save(_ draft: NoteDraft) {
+        let title = draft.title.nilIfEmpty ?? "새 메모"
+        if let id = draft.id {
+            onUpdateNote(
+                AssistantNote(
+                    id: id,
+                    title: title,
+                    body: draft.body,
+                    capturedAt: .now,
+                    linkedTaskID: nil
+                )
+            )
+        } else {
+            _ = onCreateNote(title, draft.body)
+        }
+    }
+}
+
+private struct NoteDraft {
+    var id: AssistantNote.ID?
+    var title = ""
+    var body = ""
+
+    init() {}
+
+    init(note: AssistantNote) {
+        id = note.id
+        title = note.title
+        body = note.body
+    }
+}
+
+private struct NoteEditorSheet: View {
+    @Binding var draft: NoteDraft
+    let onSave: (NoteDraft) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(draft.id == nil ? "메모 추가" : "메모 편집")
+                .font(.headline)
+
+            TextField("제목", text: $draft.title)
+                .textFieldStyle(.roundedBorder)
+
+            TextEditor(text: $draft.body)
+                .font(.body)
+                .frame(minHeight: 180)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(.separator, lineWidth: 1)
+                }
+
+            HStack {
+                Spacer()
+                Button("취소", action: onCancel)
+                Button("저장") {
+                    onSave(draft)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(width: 460)
+        .frame(minHeight: 320)
     }
 }

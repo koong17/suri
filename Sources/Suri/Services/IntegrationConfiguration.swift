@@ -5,7 +5,7 @@ struct IntegrationConfiguration: Codable {
     var gitLab: GitLabIntegrationConfiguration?
     var github: GitHubIntegrationConfiguration?
     var jira: JiraIntegrationConfiguration?
-    var email: DirectoryIntegrationConfiguration?
+    var email: EmailIntegrationConfiguration?
     var notes: DirectoryIntegrationConfiguration?
 
     static var directoryURL: URL {
@@ -76,7 +76,14 @@ struct IntegrationConfiguration: Codable {
       },
       "email": {
         "enabled": false,
-        "directory": "~/Documents/SuriEmail"
+        "mode": "local",
+        "directory": "~/Documents/SuriEmail",
+        "gmail": {
+          "clientID": "",
+          "clientSecret": "",
+          "query": "in:inbox newer_than:7d",
+          "count": 30
+        }
       },
       "notes": {
         "enabled": false,
@@ -137,9 +144,34 @@ struct JiraIntegrationConfiguration: Codable {
     var jql: String?
 }
 
+struct EmailIntegrationConfiguration: Codable {
+    var enabled: Bool?
+    var mode: EmailIntegrationMode?
+    var directory: String?
+    var gmail: GmailIntegrationConfiguration?
+}
+
+enum EmailIntegrationMode: String, Codable {
+    case local
+    case gmail
+}
+
+struct GmailIntegrationConfiguration: Codable {
+    var clientID: String?
+    var clientSecret: String?
+    var query: String?
+    var count: Int?
+}
+
 struct DirectoryIntegrationConfiguration: Codable {
     var enabled: Bool?
     var directory: String
+}
+
+extension EmailIntegrationConfiguration {
+    var directoryURL: URL {
+        URL(fileURLWithPath: (directory ?? "~/Documents/SuriEmail").expandingTildeInPath, isDirectory: true)
+    }
 }
 
 extension DirectoryIntegrationConfiguration {

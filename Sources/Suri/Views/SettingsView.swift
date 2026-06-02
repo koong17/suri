@@ -15,6 +15,8 @@ struct SettingsView: View {
     @AppStorage(PreferenceKeys.jiraEnabled) private var jiraEnabled = true
     @AppStorage(PreferenceKeys.notesEnabled) private var notesEnabled = true
     @State private var configStatusMessage: String?
+    @State private var gmailStatusMessage: String?
+    @State private var isAuthorizingGmail = false
 
     var body: some View {
         TabView {
@@ -77,6 +79,25 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Section("Gmail") {
+                    Button {
+                        authorizeGmail()
+                    } label: {
+                        Label(isAuthorizingGmail ? "Gmail 로그인 대기 중" : "Gmail 로그인", systemImage: "envelope.badge")
+                    }
+                    .disabled(isAuthorizingGmail)
+
+                    Text("email.mode를 gmail로 설정하고 Google OAuth Desktop clientID/clientSecret을 넣은 뒤 실행하세요.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let gmailStatusMessage {
+                        Text(gmailStatusMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .tabItem {
                 Label("Integrations", systemImage: "key")
@@ -92,6 +113,30 @@ struct SettingsView: View {
             configStatusMessage = "생성됨: \(url.path)"
         } catch {
             configStatusMessage = "생성 실패: \(error.localizedDescription)"
+        }
+    }
+
+    private func authorizeGmail() {
+        isAuthorizingGmail = true
+        gmailStatusMessage = "브라우저에서 Google 로그인을 완료하세요."
+
+        Task {
+            do {
+                guard let configuration = try IntegrationConfiguration.load(),
+                      let gmail = configuration.email?.gmail else {
+                    throw ServiceClientError.serviceMessage("integrations.json에 email.gmail 설정이 없습니다.")
+                }
+                try await GmailOAuthService().authorize(configuration: gmail)
+                await MainActor.run {
+                    gmailStatusMessage = "Gmail 로그인 완료"
+                    isAuthorizingGmail = false
+                }
+            } catch {
+                await MainActor.run {
+                    gmailStatusMessage = "Gmail 로그인 실패: \(error.localizedDescription)"
+                    isAuthorizingGmail = false
+                }
+            }
         }
     }
 }

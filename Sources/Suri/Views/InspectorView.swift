@@ -25,6 +25,7 @@ struct InspectorView: View {
             .padding()
         }
         .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
+        .inspectorColumnWidth(min: 300, ideal: 340, max: 440)
     }
 }
 
@@ -54,7 +55,19 @@ private struct SelectedTaskInspector: View {
                 MetadataRow(label: "담당", value: task.owner)
 
                 ForEach(task.metadata) { item in
-                    MetadataRow(label: item.label, value: item.value)
+                    if item.label == "URL" || item.label == "링크",
+                       let url = URL(string: item.value) {
+                        HStack(alignment: .top) {
+                            Text(item.label)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Link("열기", destination: url)
+                                .lineLimit(1)
+                        }
+                        .font(.callout)
+                    } else {
+                        MetadataRow(label: item.label, value: item.value)
+                    }
                 }
 
                 Divider()
@@ -212,6 +225,9 @@ private struct MetadataRow: View {
             Spacer()
             Text(value)
                 .multilineTextAlignment(.trailing)
+                .lineLimit(4)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
         }
         .font(.callout)
     }
