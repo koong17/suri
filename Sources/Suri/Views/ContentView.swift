@@ -54,37 +54,42 @@ struct ContentView: View {
             )
             .navigationTitle("Suri")
         } detail: {
-            DetailView(
-                section: selectedSidebarItem,
-                tasks: filteredTasks,
-                sources: store.sources,
-                notes: store.notes,
-                editableNoteIDs: store.editableNoteIDs,
-                lastSyncedAt: store.lastSyncedAt,
-                dueSoonHours: dueSoonHours,
-                isSyncing: store.isSyncing,
-                lastSyncError: store.lastSyncError,
-                isUsingFallbackData: store.isUsingFallbackData,
-                selectedTaskID: selectedTaskBinding,
-                onSync: syncNow,
-                onCreateReminder: store.createReminder,
-                onCreateNote: { title, body in store.createNote(title: title, body: body) },
-                onUpdateNote: store.updateNote,
-                onDeleteNote: store.deleteNote,
-                onMarkReviewed: { store.markReviewed(selectedTaskID) },
-                showInspector: $showInspector
-            )
-            .inspector(isPresented: $showInspector) {
-                InspectorView(
+            HStack(spacing: 0) {
+                DetailView(
                     section: selectedSidebarItem,
-                    selectedTask: selectedTask,
+                    tasks: filteredTasks,
                     sources: store.sources,
                     notes: store.notes,
+                    editableNoteIDs: store.editableNoteIDs,
                     lastSyncedAt: store.lastSyncedAt,
                     dueSoonHours: dueSoonHours,
-                    onMarkReviewed: { store.markReviewed(selectedTaskID) }
+                    isSyncing: store.isSyncing,
+                    lastSyncError: store.lastSyncError,
+                    isUsingFallbackData: store.isUsingFallbackData,
+                    selectedTaskID: selectedTaskBinding,
+                    onSync: syncNow,
+                    onCreateReminder: store.createReminder,
+                    onCreateNote: { title, body in store.createNote(title: title, body: body) },
+                    onUpdateNote: store.updateNote,
+                    onDeleteNote: store.deleteNote,
+                    onMarkReviewed: { store.markReviewed(selectedTaskID) },
+                    showInspector: $showInspector
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                InlineInspectorColumn(isPresented: showInspector) {
+                    InspectorView(
+                        section: selectedSidebarItem,
+                        selectedTask: selectedTask,
+                        sources: store.sources,
+                        notes: store.notes,
+                        lastSyncedAt: store.lastSyncedAt,
+                        dueSoonHours: dueSoonHours,
+                        onMarkReviewed: { store.markReviewed(selectedTaskID) }
+                    )
+                }
             }
+            .animation(.easeOut(duration: 0.16), value: showInspector)
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "검색")
         .navigationSplitViewStyle(.prominentDetail)
@@ -191,5 +196,29 @@ struct ContentView: View {
 
     private var syncIntervalSeconds: TimeInterval {
         max(syncIntervalMinutes, 1) * 60
+    }
+}
+
+private struct InlineInspectorColumn<Content: View>: View {
+    let isPresented: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Divider()
+                .opacity(isPresented ? 1 : 0)
+
+            content
+                .frame(width: 340)
+                .frame(maxHeight: .infinity)
+                .background(.regularMaterial)
+        }
+        .frame(width: isPresented ? 341 : 0, alignment: .trailing)
+        .frame(maxHeight: .infinity)
+        .clipped()
+        .opacity(isPresented ? 1 : 0)
+        .allowsHitTesting(isPresented)
+        .accessibilityHidden(!isPresented)
+        .accessibilityIdentifier("InlineInspectorColumn")
     }
 }

@@ -24,8 +24,7 @@ struct InspectorView: View {
             }
             .padding()
         }
-        .frame(minWidth: 320, idealWidth: 340, maxWidth: 380)
-        .inspectorColumnWidth(min: 320, ideal: 340, max: 380)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
