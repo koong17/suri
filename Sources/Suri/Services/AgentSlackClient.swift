@@ -40,13 +40,14 @@ struct AgentSlackClient: WorkItemProvider {
                 metadata: metadata
             )
         }
+        let groupedTasks = SlackDirectMessageTaskGrouper().grouped(tasks)
 
         return ProviderSnapshot(
-            tasks: tasks,
+            tasks: groupedTasks,
             connection: SourceConnection(
                 source: .slack,
                 isConnected: true,
-                unreadCount: tasks.count,
+                unreadCount: groupedTasks.count,
                 lastActivity: .now,
                 summary: "읽음 여부와 무관하게 최근 멘션을 확인했습니다."
             )

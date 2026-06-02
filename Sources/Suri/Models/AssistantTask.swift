@@ -15,7 +15,7 @@ struct AssistantTask: Identifiable, Hashable, Codable {
 
     var reviewKey: String {
         let stableMetadata = metadata
-            .first { ["링크", "URL", "MR", "이슈", "파일", "메모"].contains($0.label) }?
+            .first { ["대화", "링크", "URL", "MR", "이슈", "파일", "메모"].contains($0.label) }?
             .value
             ?? context
 
