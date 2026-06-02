@@ -54,7 +54,7 @@ struct DetailView: View {
                 TaskListView(tasks: tasks, selectedTaskID: $selectedTaskID)
             }
         }
-        .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: LayoutMetrics.detailMinWidth, maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Suri")
         .toolbar {
             ToolbarItemGroup {
