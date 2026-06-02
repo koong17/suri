@@ -3,15 +3,19 @@ import Foundation
 extension Array where Element == AssistantTask {
     func sortedForAssistant() -> [AssistantTask] {
         sorted { first, second in
+            if first.isActiveJiraIssue != second.isActiveJiraIssue {
+                return first.isActiveJiraIssue
+            }
+
             switch (first.dueDate, second.dueDate) {
             case let (.some(firstDate), .some(secondDate)):
-                firstDate < secondDate
+                return firstDate < secondDate
             case (.some, .none):
-                true
+                return true
             case (.none, .some):
-                false
+                return false
             case (.none, .none):
-                first.priority.sortRank > second.priority.sortRank
+                return first.priority.sortRank > second.priority.sortRank
             }
         }
     }

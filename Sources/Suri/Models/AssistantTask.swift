@@ -32,6 +32,22 @@ struct AssistantTask: Identifiable, Hashable, Codable {
             && metadata.contains { $0.label == "분류" && $0.value.contains("중요") }
     }
 
+    var isActiveJiraIssue: Bool {
+        guard source == .jira, status != .reviewed else {
+            return false
+        }
+
+        let jiraStatus = metadata
+            .first { $0.label == "상태" }?
+            .value
+            .lowercased()
+            ?? context.lowercased()
+
+        return jiraStatus.contains("진행")
+            || jiraStatus.contains("in progress")
+            || jiraStatus.contains("doing")
+    }
+
     var primaryURL: URL? {
         metadata
             .filter { ["링크", "URL", "MR", "PR", "Issue", "이슈"].contains($0.label) }

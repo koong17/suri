@@ -11,6 +11,10 @@ let package = Package(
         .executable(name: "Suri", targets: ["Suri"])
     ],
     targets: [
-        .executableTarget(name: "Suri")
+        .executableTarget(name: "Suri"),
+        .testTarget(
+            name: "SuriTests",
+            dependencies: ["Suri"]
+        )
     ]
 )
