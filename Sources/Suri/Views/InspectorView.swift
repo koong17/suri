@@ -209,11 +209,7 @@ private struct InspectorCard<Content: View>: View {
         content
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
