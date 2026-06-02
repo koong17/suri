@@ -203,13 +203,31 @@ private struct NotesInspector: View {
 }
 
 private struct InspectorCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     @ViewBuilder var content: Content
 
     var body: some View {
         content
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(cardBackground, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(cardBorder, lineWidth: 0.5)
+            }
+            .shadow(color: shadowColor, radius: 10, x: 0, y: 2)
+    }
+
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color(nsColor: .controlBackgroundColor) : Color.white
+    }
+
+    private var cardBorder: Color {
+        colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.08)
+    }
+
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.18) : Color.black.opacity(0.06)
     }
 }
 
