@@ -21,7 +21,11 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 240, ideal: 240, max: 260)
+        .navigationSplitViewColumnWidth(
+            min: LayoutMetrics.sidebarMinWidth,
+            ideal: LayoutMetrics.sidebarIdealWidth,
+            max: LayoutMetrics.sidebarMaxWidth
+        )
     }
 
     private var workItems: [SidebarItem] {
