@@ -4,6 +4,7 @@ import Foundation
 struct AssistantSyncService {
     func sync(preferences: SyncPreferences) async -> AssistantSyncResult {
         do {
+            let attemptedAt = Date.now
             guard let configuration = try IntegrationConfiguration.load() else {
                 return emptyResult(reason: "연동 설정 파일이 없습니다.")
             }
@@ -22,21 +23,38 @@ struct AssistantSyncService {
                 do {
                     let snapshot = try await provider.fetchSnapshot()
                     tasks += snapshot.tasks
-                    sources.append(snapshot.connection)
+                    sources.append(healthyConnection(snapshot.connection, attemptedAt: attemptedAt))
                     notes += snapshot.notes
                 } catch {
                     errors.append("\(provider.source.title): \(error.localizedDescription)")
-                    sources.append(disconnectedSource(provider.source, error: error))
+                    sources.append(disconnectedSource(provider.source, error: error, attemptedAt: attemptedAt))
                 }
             }
 
+            let deduplicationResult = TaskDeduplicator().deduplicate(tasks.sortedForAssistant())
+            do {
+                try TaskDedupStore().recordSeenTasks(deduplicationResult.tasks, syncedAt: attemptedAt)
+            } catch {
+                errors.append("중복 캐시: \(error.localizedDescription)")
+            }
+
+            do {
+                try AssistantAIQueueStore().refreshPendingItems(from: deduplicationResult.tasks, syncedAt: attemptedAt)
+            } catch {
+                errors.append("AI 큐: \(error.localizedDescription)")
+            }
+
             return AssistantSyncResult(
-                tasks: tasks.sortedForAssistant(),
-                sources: completeSources(from: sources),
+                tasks: deduplicationResult.tasks,
+                sources: completeSources(
+                    from: sources,
+                    attemptedAt: attemptedAt,
+                    duplicateCounts: deduplicationResult.duplicateCounts
+                ),
                 notes: notes.sortedByCapturedDateDescending(),
                 providerErrors: errors,
                 usedFallback: false,
-                syncedAt: .now
+                syncedAt: attemptedAt
             )
         } catch {
             return emptyResult(reason: error.localizedDescription)
@@ -63,6 +81,12 @@ struct AssistantSyncService {
            let gitLab = configuration.gitLab,
            gitLab.enabled != false {
             providers.append(GitLabClient(configuration: gitLab))
+        }
+
+        if preferences.includes(.github),
+           let github = configuration.github,
+           github.enabled != false {
+            providers.append(GitHubClient(configuration: github))
         }
 
         if preferences.includes(.jira),
@@ -94,7 +118,7 @@ struct AssistantSyncService {
 
         return AssistantSyncResult(
             tasks: [],
-            sources: completeSources(from: []),
+            sources: completeSources(from: [], attemptedAt: .now, duplicateCounts: [:]),
             notes: [],
             providerErrors: errors,
             usedFallback: true,
@@ -102,26 +126,47 @@ struct AssistantSyncService {
         )
     }
 
-    private func disconnectedSource(_ source: WorkSource, error: Error) -> SourceConnection {
+    private func healthyConnection(_ connection: SourceConnection, attemptedAt: Date) -> SourceConnection {
+        var connection = connection
+        connection.isConnected = true
+        connection.health = .healthy
+        connection.lastSuccessAt = attemptedAt
+        connection.lastAttemptAt = attemptedAt
+        connection.errorMessage = nil
+        return connection
+    }
+
+    private func disconnectedSource(_ source: WorkSource, error: Error, attemptedAt: Date) -> SourceConnection {
         SourceConnection(
             source: source,
             isConnected: false,
             unreadCount: 0,
-            lastActivity: .now,
-            summary: error.localizedDescription
+            lastActivity: attemptedAt,
+            summary: error.localizedDescription,
+            health: .disconnected,
+            lastAttemptAt: attemptedAt,
+            errorMessage: error.localizedDescription
         )
     }
 
-    private func completeSources(from sources: [SourceConnection]) -> [SourceConnection] {
+    private func completeSources(
+        from sources: [SourceConnection],
+        attemptedAt: Date,
+        duplicateCounts: [WorkSource: Int]
+    ) -> [SourceConnection] {
         WorkSource.allCases.map { source in
-            sources.first { $0.source == source }
+            var connection = sources.first { $0.source == source }
                 ?? SourceConnection(
                     source: source,
                     isConnected: false,
                     unreadCount: 0,
-                    lastActivity: .now,
-                    summary: "설정 파일에 활성화된 연결이 없습니다."
+                    lastActivity: attemptedAt,
+                    summary: "설정 파일에 활성화된 연결이 없습니다.",
+                    health: .disabled,
+                    lastAttemptAt: attemptedAt
                 )
+            connection.duplicateCount = duplicateCounts[source] ?? 0
+            return connection
         }
     }
 }

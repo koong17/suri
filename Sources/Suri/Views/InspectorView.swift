@@ -132,13 +132,32 @@ private struct SourceHealthInspector: View {
                 )
 
                 ForEach(sources) { connection in
-                    HStack {
-                        Label(connection.source.title, systemImage: connection.source.systemImage)
-                            .foregroundStyle(connection.source.accent)
-                        Spacer()
-                        Text("\(connection.unreadCount)")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Label(connection.source.title, systemImage: connection.source.systemImage)
+                                .foregroundStyle(connection.source.accent)
+                            Spacer()
+                            Label(connection.health.title, systemImage: connection.health.systemImage)
+                                .foregroundStyle(connection.health.tint)
+                        }
+
+                        HStack {
+                            Text("\(connection.unreadCount)개 항목")
+                                .monospacedDigit()
+                            if connection.duplicateCount > 0 {
+                                Text("중복 \(connection.duplicateCount)개 정리")
+                            }
+                            Spacer()
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        if let errorMessage = connection.errorMessage?.nilIfEmpty {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
                     }
                     .font(.callout)
                 }

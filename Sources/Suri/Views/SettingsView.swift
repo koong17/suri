@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(PreferenceKeys.slackEnabled) private var slackEnabled = true
     @AppStorage(PreferenceKeys.emailEnabled) private var emailEnabled = true
     @AppStorage(PreferenceKeys.gitLabEnabled) private var gitLabEnabled = true
+    @AppStorage(PreferenceKeys.githubEnabled) private var githubEnabled = true
     @AppStorage(PreferenceKeys.jiraEnabled) private var jiraEnabled = true
     @AppStorage(PreferenceKeys.notesEnabled) private var notesEnabled = true
     @State private var configStatusMessage: String?
@@ -50,6 +51,7 @@ struct SettingsView: View {
                     Toggle("Slack", isOn: $slackEnabled)
                     Toggle("Email", isOn: $emailEnabled)
                     Toggle("GitLab", isOn: $gitLabEnabled)
+                    Toggle("GitHub", isOn: $githubEnabled)
                     Toggle("Jira", isOn: $jiraEnabled)
                     Toggle("Notes", isOn: $notesEnabled)
                 }

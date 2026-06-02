@@ -16,6 +16,7 @@ struct ContentView: View {
     @AppStorage(PreferenceKeys.slackEnabled) private var slackEnabled = true
     @AppStorage(PreferenceKeys.emailEnabled) private var emailEnabled = true
     @AppStorage(PreferenceKeys.gitLabEnabled) private var gitLabEnabled = true
+    @AppStorage(PreferenceKeys.githubEnabled) private var githubEnabled = true
     @AppStorage(PreferenceKeys.jiraEnabled) private var jiraEnabled = true
     @AppStorage(PreferenceKeys.notesEnabled) private var notesEnabled = true
 
@@ -90,14 +91,13 @@ struct ContentView: View {
 
             didRunInitialSync = true
             store.loadCachedSnapshot()
-            await syncIfNeeded()
         }
         .task(id: scenePhase) {
             guard scenePhase == .active, autoSyncEnabled else {
                 return
             }
 
-            await syncIfNeeded()
+            await syncOnActivation()
             await runPeriodicSyncLoop()
         }
     }
@@ -133,6 +133,7 @@ struct ContentView: View {
         if slackEnabled { enabledSources.insert(.slack) }
         if emailEnabled { enabledSources.insert(.email) }
         if gitLabEnabled { enabledSources.insert(.gitLab) }
+        if githubEnabled { enabledSources.insert(.github) }
         if jiraEnabled { enabledSources.insert(.jira) }
         if notesEnabled { enabledSources.insert(.notes) }
 
@@ -160,6 +161,14 @@ struct ContentView: View {
             force: false,
             minimumInterval: syncIntervalSeconds
         )
+    }
+
+    private func syncOnActivation() async {
+        guard autoSyncEnabled else {
+            return
+        }
+
+        await store.syncSources(preferences: syncPreferences, force: true)
     }
 
     private func runPeriodicSyncLoop() async {

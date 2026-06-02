@@ -45,7 +45,7 @@ struct DetailView: View {
                     Label(isSyncing ? "동기화 중" : "동기화", systemImage: "arrow.clockwise")
                 }
                 .disabled(isSyncing)
-                .help("Slack, Email, GitLab, Jira, Notes를 다시 확인")
+                .help("Slack, Email, GitLab, GitHub, Jira, Notes를 다시 확인")
 
                 Button(action: onCreateReminder) {
                     Label("확인 항목 추가", systemImage: "plus")
@@ -153,7 +153,7 @@ private struct DetailHeader: View {
         case .today:
             "오늘 처리해야 할 일정, 확인 요청, 대기 중인 결정을 한곳에 모았습니다."
         case .inbox:
-            "Suri가 판단을 요청하는 Slack, Email, GitLab, Jira, Notes 항목입니다."
+            "Suri가 판단을 요청하는 Slack, Email, GitLab, GitHub, Jira, Notes 항목입니다."
         case .importantSlack:
             "최근 Slack 멘션 중 답변, 승인, 마감, 장애, 배포처럼 우선 확인해야 할 항목입니다."
         case .deadlines:
@@ -320,11 +320,16 @@ private struct SourcesDetailView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(connection.isConnected ? "연결됨" : "미연결")
-                        .foregroundStyle(connection.isConnected ? .green : .secondary)
+                    Label(connection.health.title, systemImage: connection.health.systemImage)
+                        .foregroundStyle(connection.health.tint)
                     Text("\(connection.unreadCount)개 새 항목")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if connection.duplicateCount > 0 {
+                        Text("중복 \(connection.duplicateCount)개 정리")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(.vertical, 8)

@@ -1,6 +1,6 @@
 # Suri
 
-Suri is a native macOS personal assistant app for keeping track of work signals across Slack, GitLab, Jira, email, and notes. It is designed to surface messages that need your attention, deadlines that are coming up, and follow-up work that should not get lost.
+Suri is a native macOS personal assistant app for keeping track of work signals across Slack, email, GitLab, GitHub, Jira, and notes. It is designed to surface messages that need your attention, deadlines that are coming up, and follow-up work that should not get lost.
 
 ## Features
 
@@ -11,11 +11,13 @@ Suri is a native macOS personal assistant app for keeping track of work signals 
 - Slack support for personal mentions, DMs, `@here`, `@channel`, and `@everyone`
 - Separate `Important Slack` view for high-priority Slack items
 - GitLab review request tracking with `reviews_for_me`
+- GitHub review request and assigned issue tracking through the authenticated `gh` CLI
 - Jira, local email, and local notes integration structure
 - Cached last successful sync result
 - Automatic sync when the app becomes active
 - Periodic sync while the app is active
 - Reviewed items stay visible with a different state instead of disappearing
+- Batch deduplication, source health metadata, and a durable AI review queue manifest
 
 ## Requirements
 
@@ -23,6 +25,7 @@ Suri is a native macOS personal assistant app for keeping track of work signals 
 - Xcode Command Line Tools
 - Swift Package Manager
 - Optional: `agent-slack`
+- Optional: GitHub CLI (`gh`) authenticated with `gh auth login`
 - Optional: `codex` CLI
 
 ## Run
@@ -84,6 +87,16 @@ Example:
     "scope": "reviews_for_me",
     "projectIDs": ["owner/project"]
   },
+  "github": {
+    "enabled": true,
+    "mode": "ghCLI",
+    "token": "",
+    "owner": "",
+    "repos": ["koong17/suri"],
+    "count": 30,
+    "includePullRequests": true,
+    "includeIssues": true
+  },
   "jira": {
     "enabled": false,
     "baseURL": "https://your-domain.atlassian.net",
@@ -137,12 +150,41 @@ To track only merge requests that need your review:
 "scope": "reviews_for_me"
 ```
 
+## GitHub
+
+The default GitHub mode is `ghCLI`, which uses the account already authenticated by GitHub CLI:
+
+```bash
+gh auth login
+gh auth status
+```
+
+Suri checks:
+
+- open pull requests where review is requested from `@me`
+- open issues assigned to `@me`
+
+Set `repos` to narrow the search:
+
+```json
+"repos": ["koong17/suri"]
+```
+
+If `token` is present, Suri passes it only to the `gh` subprocess as `GH_TOKEN` and `GITHUB_TOKEN`. Leaving it empty keeps authentication in GitHub CLI.
+
 ## Cache And Sync
 
 The last successful sync result is cached at:
 
 ```text
 ~/Library/Application Support/Suri/sync-cache.json
+```
+
+Operational pipeline files:
+
+```text
+~/Library/Application Support/Suri/dedup-cache.json
+~/Library/Application Support/Suri/ai-queue.json
 ```
 
 On launch, Suri loads the cached snapshot first so the app can show useful data immediately. It then syncs again when conditions allow.
@@ -162,7 +204,7 @@ Automatic sync and sync interval can be changed in Settings.
 ```text
 Sources/Suri/App              App entry point and scene structure
 Sources/Suri/Models           Task, source, and sidebar models
-Sources/Suri/Services         Slack, GitLab, Jira, cache, notification, and sync services
+Sources/Suri/Services         Slack, GitLab, GitHub, Jira, cache, notification, and sync services
 Sources/Suri/Stores           App state and sync state
 Sources/Suri/Support          Commands, preferences, and formatting helpers
 Sources/Suri/Views            Sidebar, detail, inspector, and settings views

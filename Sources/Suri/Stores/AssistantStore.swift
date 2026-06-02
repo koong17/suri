@@ -317,6 +317,21 @@ extension AssistantStore {
                 ]
             ),
             AssistantTask(
+                title: "PR #128 review request",
+                source: .github,
+                dueDate: Date.hoursFromNow(36),
+                priority: .high,
+                status: .waiting,
+                context: "GitHub에서 내 리뷰를 기다리는 pull request입니다.",
+                owner: "나",
+                requiresUserReview: true,
+                recommendedAction: "변경 범위와 CI 상태를 확인한 뒤 리뷰 코멘트 남기기",
+                metadata: [
+                    MetadataItem(label: "Repository", value: "koong17/suri"),
+                    MetadataItem(label: "PR", value: "#128")
+                ]
+            ),
+            AssistantTask(
                 title: "TMS-219 QA 확인",
                 source: .jira,
                 dueDate: Date.hoursFromNow(30),
@@ -368,6 +383,13 @@ extension AssistantStore {
                 unreadCount: 3,
                 lastActivity: Date.hoursFromNow(-4),
                 summary: "내 리뷰, 실패한 파이프라인, 머지 대기를 추적합니다."
+            ),
+            SourceConnection(
+                source: .github,
+                isConnected: true,
+                unreadCount: 1,
+                lastActivity: Date.hoursFromNow(-3),
+                summary: "리뷰 요청 PR과 담당 이슈를 추적합니다."
             ),
             SourceConnection(
                 source: .jira,

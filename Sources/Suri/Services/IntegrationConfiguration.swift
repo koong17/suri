@@ -3,6 +3,7 @@ import Foundation
 struct IntegrationConfiguration: Codable {
     var slack: SlackIntegrationConfiguration?
     var gitLab: GitLabIntegrationConfiguration?
+    var github: GitHubIntegrationConfiguration?
     var jira: JiraIntegrationConfiguration?
     var email: DirectoryIntegrationConfiguration?
     var notes: DirectoryIntegrationConfiguration?
@@ -56,6 +57,16 @@ struct IntegrationConfiguration: Codable {
         "scope": "reviews_for_me",
         "projectIDs": []
       },
+      "github": {
+        "enabled": true,
+        "mode": "ghCLI",
+        "token": "",
+        "owner": "",
+        "repos": [],
+        "count": 30,
+        "includePullRequests": true,
+        "includeIssues": true
+      },
       "jira": {
         "enabled": false,
         "baseURL": "https://your-domain.atlassian.net",
@@ -100,6 +111,22 @@ struct GitLabIntegrationConfiguration: Codable {
     var privateToken: String
     var scope: String?
     var projectIDs: [String]?
+}
+
+struct GitHubIntegrationConfiguration: Codable {
+    var enabled: Bool?
+    var mode: GitHubIntegrationMode?
+    var token: String?
+    var owner: String?
+    var repos: [String]?
+    var count: Int?
+    var includePullRequests: Bool?
+    var includeIssues: Bool?
+}
+
+enum GitHubIntegrationMode: String, Codable {
+    case ghCLI
+    case webAPI
 }
 
 struct JiraIntegrationConfiguration: Codable {

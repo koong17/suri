@@ -11,6 +11,7 @@ enum PreferenceKeys {
     static let slackEnabled = "source.slack.enabled"
     static let emailEnabled = "source.email.enabled"
     static let gitLabEnabled = "source.gitLab.enabled"
+    static let githubEnabled = "source.github.enabled"
     static let jiraEnabled = "source.jira.enabled"
     static let notesEnabled = "source.notes.enabled"
 }
