@@ -24,6 +24,7 @@ struct WindowSizeBridge: NSViewRepresentable {
         }
 
         window.minSize = minimumSize
+        window.styleMask.insert(.resizable)
 
         let currentFrame = window.frame
         let targetWidth = max(currentFrame.width, minimumSize.width)

@@ -8,7 +8,6 @@ struct ContentView: View {
     @SceneStorage("assistant.selectedTaskID") private var selectedTaskIDRaw = ""
     @SceneStorage("assistant.showInspector") private var showInspector = true
     @SceneStorage("assistant.searchText") private var searchText = ""
-    @SceneStorage("assistant.inspectorWidth") private var inspectorWidth = LayoutMetrics.inspectorDefaultWidth
     @AppStorage(PreferenceKeys.dueSoonHours) private var dueSoonHours = 24.0
     @AppStorage(PreferenceKeys.notificationsEnabled) private var notificationsEnabled = true
     @AppStorage(PreferenceKeys.notificationLeadTimeRaw) private var notificationLeadTimeRaw = NotificationLeadTime.oneDay.rawValue
@@ -79,7 +78,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.leading, showInspector ? LayoutMetrics.detailLeadingGutterWhenInspectorIsOpen : 0)
 
-                InlineInspectorColumn(isPresented: showInspector, width: $inspectorWidth) {
+                InlineInspectorColumn(isPresented: showInspector) {
                     InspectorView(
                         section: selectedSidebarItem,
                         selectedTask: selectedTask,
@@ -203,81 +202,24 @@ struct ContentView: View {
 
 private struct InlineInspectorColumn<Content: View>: View {
     let isPresented: Bool
-    @Binding var width: Double
     @ViewBuilder var content: Content
-    @State private var dragStartWidth: Double?
 
     var body: some View {
         HStack(spacing: 0) {
-            InspectorResizeHandle(isPresented: isPresented)
-                .frame(width: LayoutMetrics.inspectorResizeHandleWidth)
-                .gesture(resizeGesture)
-                .accessibilityLabel("인스펙터 너비 조절")
-                .accessibilityValue("\(Int(clampedWidth)) 포인트")
-                .accessibilityAdjustableAction { direction in
-                    switch direction {
-                    case .increment:
-                        width = clamp(clampedWidth + 20)
-                    case .decrement:
-                        width = clamp(clampedWidth - 20)
-                    @unknown default:
-                        break
-                    }
-                }
+            Divider()
+                .opacity(isPresented ? 1 : 0)
 
             content
-                .frame(width: clampedWidth)
+                .frame(width: LayoutMetrics.inspectorWidth)
                 .frame(maxHeight: .infinity)
                 .background(.regularMaterial)
         }
-        .frame(width: isPresented ? clampedWidth + LayoutMetrics.inspectorResizeHandleWidth : 0, alignment: .trailing)
+        .frame(width: isPresented ? LayoutMetrics.inspectorWidth + 1 : 0, alignment: .trailing)
         .frame(maxHeight: .infinity)
         .clipped()
         .opacity(isPresented ? 1 : 0)
         .allowsHitTesting(isPresented)
         .accessibilityHidden(!isPresented)
         .accessibilityIdentifier("InlineInspectorColumn")
-    }
-
-    private var resizeGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                if dragStartWidth == nil {
-                    dragStartWidth = clampedWidth
-                }
-
-                width = clamp((dragStartWidth ?? clampedWidth) - value.translation.width)
-            }
-            .onEnded { _ in
-                width = clampedWidth
-                dragStartWidth = nil
-            }
-    }
-
-    private var clampedWidth: Double {
-        clamp(width)
-    }
-
-    private func clamp(_ proposedWidth: Double) -> Double {
-        min(max(proposedWidth, LayoutMetrics.inspectorMinWidth), LayoutMetrics.inspectorMaxWidth)
-    }
-}
-
-private struct InspectorResizeHandle: View {
-    let isPresented: Bool
-    @State private var isHovering = false
-
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(isHovering ? Color.accentColor.opacity(0.08) : Color.clear)
-
-            Rectangle()
-                .fill(isHovering ? Color.accentColor.opacity(0.65) : Color.secondary.opacity(isPresented ? 0.28 : 0))
-                .frame(width: 1)
-        }
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .help("드래그해서 인스펙터 너비 조절")
     }
 }
