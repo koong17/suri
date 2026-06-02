@@ -54,7 +54,8 @@ struct DetailView: View {
                 TaskListView(tasks: tasks, selectedTaskID: $selectedTaskID)
             }
         }
-        .navigationTitle(section.title)
+        .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Suri")
         .toolbar {
             ToolbarItemGroup {
                 Button(action: onSync) {
