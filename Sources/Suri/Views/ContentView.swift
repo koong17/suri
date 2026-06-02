@@ -76,6 +76,7 @@ struct ContentView: View {
                     showInspector: $showInspector
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.leading, showInspector ? 16 : 0)
 
                 InlineInspectorColumn(isPresented: showInspector) {
                     InspectorView(
