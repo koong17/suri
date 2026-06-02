@@ -133,10 +133,12 @@ struct AssistantSyncService {
     private func healthyConnection(_ connection: SourceConnection, attemptedAt: Date) -> SourceConnection {
         var connection = connection
         connection.isConnected = true
-        connection.health = .healthy
+        connection.health = connection.health == .degraded ? .degraded : .healthy
         connection.lastSuccessAt = attemptedAt
         connection.lastAttemptAt = attemptedAt
-        connection.errorMessage = nil
+        if connection.health == .healthy {
+            connection.errorMessage = nil
+        }
         return connection
     }
 

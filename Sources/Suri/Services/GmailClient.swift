@@ -15,13 +15,14 @@ struct GmailClient: WorkItemProvider {
         let accessToken = try await authService.accessToken(configuration: gmail)
         let refs = try await listMessages(accessToken: accessToken, configuration: gmail)
         var tasks: [AssistantTask] = []
+        var skippedMessageCount = 0
 
         for reference in refs {
             do {
                 let message = try await fetchMessage(id: reference.id, accessToken: accessToken)
                 tasks.append(task(from: message))
             } catch {
-                continue
+                skippedMessageCount += 1
             }
         }
 
@@ -32,7 +33,11 @@ struct GmailClient: WorkItemProvider {
                 isConnected: true,
                 unreadCount: tasks.count,
                 lastActivity: .now,
-                summary: "Gmail API에서 최근 메일 확인 항목을 가져왔습니다."
+                summary: skippedMessageCount > 0
+                    ? "Gmail API에서 최근 메일을 가져왔지만 \(skippedMessageCount)개 메시지는 상세 조회에 실패했습니다."
+                    : "Gmail API에서 최근 메일 확인 항목을 가져왔습니다.",
+                health: skippedMessageCount > 0 ? .degraded : .healthy,
+                errorMessage: skippedMessageCount > 0 ? "\(skippedMessageCount)개 Gmail 메시지 상세 조회 실패" : nil
             )
         )
     }
