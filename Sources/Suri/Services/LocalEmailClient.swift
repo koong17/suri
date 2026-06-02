@@ -1,7 +1,7 @@
 import Foundation
 
 struct LocalEmailClient: WorkItemProvider {
-    let configuration: DirectoryIntegrationConfiguration
+    let configuration: EmailIntegrationConfiguration
 
     var source: WorkSource { .email }
 

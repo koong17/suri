@@ -12,12 +12,13 @@ Suri is a native macOS personal assistant app for keeping track of work signals 
 - Separate `Important Slack` view for high-priority Slack items
 - GitLab review request tracking with `reviews_for_me`
 - GitHub review request and assigned issue tracking through the authenticated `gh` CLI
-- Jira, local email, and local notes integration structure
+- Jira, Gmail or local email, and local notes integration structure
 - Cached last successful sync result
 - Automatic sync when the app becomes active
 - Periodic sync while the app is active
 - Reviewed items stay visible with a different state instead of disappearing
 - Batch deduplication, source health metadata, and a durable AI review queue manifest
+- App-created notes can be edited and deleted
 
 ## Requirements
 
@@ -106,7 +107,14 @@ Example:
   },
   "email": {
     "enabled": false,
-    "directory": "~/Documents/SuriEmail"
+    "mode": "local",
+    "directory": "~/Documents/SuriEmail",
+    "gmail": {
+      "clientID": "",
+      "clientSecret": "",
+      "query": "in:inbox newer_than:7d",
+      "count": 30
+    }
   },
   "notes": {
     "enabled": false,
@@ -184,6 +192,34 @@ The default JQL tracks open work where the authenticated user is assigned, repor
 
 Use a narrower `jql` value in `integrations.json` if you only want assigned issues.
 
+## Gmail
+
+Suri supports Gmail through the Gmail API using the same installed-app loopback OAuth pattern used by Lorekeeper:
+
+- create a Google OAuth Desktop client
+- enable the Gmail API in the Google Cloud project
+- put `clientID` and `clientSecret` under `email.gmail`
+- set `"email": { "mode": "gmail", ... }`
+- run `Settings > Integrations > Gmail 로그인`
+
+The Gmail token is stored locally at:
+
+```text
+~/Library/Application Support/Suri/gmail-token.json
+```
+
+The file is written with user-only permissions when possible. Use the `query` value to control what Suri imports, for example `in:inbox newer_than:7d` or `is:unread newer_than:14d`.
+
+## App Notes
+
+Notes created inside Suri are stored separately from synced note folders:
+
+```text
+~/Library/Application Support/Suri/app-notes.json
+```
+
+Only app-created notes are editable/deletable in the UI. Notes imported from `~/Documents/SuriNotes` remain read-only source data.
+
 ## Cache And Sync
 
 The last successful sync result is cached at:
@@ -197,6 +233,7 @@ Operational pipeline files:
 ```text
 ~/Library/Application Support/Suri/dedup-cache.json
 ~/Library/Application Support/Suri/ai-queue.json
+~/Library/Application Support/Suri/app-notes.json
 ```
 
 On launch, Suri loads the cached snapshot first so the app can show useful data immediately. It then syncs again when conditions allow.
@@ -216,7 +253,7 @@ Automatic sync and sync interval can be changed in Settings.
 ```text
 Sources/Suri/App              App entry point and scene structure
 Sources/Suri/Models           Task, source, and sidebar models
-Sources/Suri/Services         Slack, GitLab, GitHub, Jira, cache, notification, and sync services
+Sources/Suri/Services         Slack, Gmail/email, GitLab, GitHub, Jira, cache, notification, and sync services
 Sources/Suri/Stores           App state and sync state
 Sources/Suri/Support          Commands, preferences, and formatting helpers
 Sources/Suri/Views            Sidebar, detail, inspector, and settings views

@@ -21,6 +21,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 300)
     }
 
     private var workItems: [SidebarItem] {

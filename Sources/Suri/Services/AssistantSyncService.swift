@@ -98,7 +98,11 @@ struct AssistantSyncService {
         if preferences.includes(.email),
            let email = configuration.email,
            email.enabled != false {
-            providers.append(LocalEmailClient(configuration: email))
+            if email.mode == .gmail {
+                providers.append(GmailClient(configuration: email))
+            } else {
+                providers.append(LocalEmailClient(configuration: email))
+            }
         }
 
         if preferences.includes(.notes),
