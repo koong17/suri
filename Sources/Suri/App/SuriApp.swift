@@ -5,9 +5,9 @@ struct SuriApp: App {
     var body: some Scene {
         WindowGroup("Suri") {
             ContentView()
-                .frame(minWidth: 920, minHeight: 620)
+                .frame(minWidth: 1_180, minHeight: 680)
         }
-        .defaultSize(width: 1160, height: 760)
+        .defaultSize(width: 1_280, height: 800)
         .commands {
             AssistantCommands()
         }

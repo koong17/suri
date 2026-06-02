@@ -87,7 +87,8 @@ struct ContentView: View {
             }
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: "검색")
-        .navigationSplitViewStyle(.balanced)
+        .navigationSplitViewStyle(.prominentDetail)
+        .background(WindowSizeBridge(minimumSize: CGSize(width: 1_180, height: 680)))
         .focusedValue(\.assistantCommandHandlers, commandHandlers)
         .task {
             guard !didRunInitialSync else {
