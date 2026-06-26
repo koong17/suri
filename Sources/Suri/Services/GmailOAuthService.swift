@@ -1,6 +1,54 @@
 import Foundation
 import Network
 
+struct GmailOAuthClientCredentials {
+    var clientID: String
+    var clientSecret: String
+    var sourceDescription: String
+
+    static func resolve(
+        configuration: GmailIntegrationConfiguration,
+        candidateFiles: [URL]? = nil
+    ) throws -> GmailOAuthClientCredentials {
+        if let clientID = configuration.clientID?.nilIfEmpty,
+           let clientSecret = configuration.clientSecret?.nilIfEmpty {
+            return GmailOAuthClientCredentials(
+                clientID: clientID,
+                clientSecret: clientSecret,
+                sourceDescription: "integrations.json"
+            )
+        }
+
+        let files = candidateFiles ?? defaultCandidateFiles(for: configuration)
+        for file in files where FileManager.default.fileExists(atPath: file.path) {
+            let data = try Data(contentsOf: file)
+            let document = try JSONDecoder().decode(GoogleOAuthClientSecretDocument.self, from: data)
+            if let secret = document.preferredClientSecret {
+                return GmailOAuthClientCredentials(
+                    clientID: secret.clientID,
+                    clientSecret: secret.clientSecret,
+                    sourceDescription: file.path
+                )
+            }
+        }
+
+        let preferredPath = IntegrationConfiguration.gmailClientSecretFileURL.path
+        throw ServiceClientError.serviceMessage(
+            "Gmail OAuth 클라이언트 설정이 없습니다. Google Cloud에서 Desktop OAuth JSON을 내려받아 \(preferredPath)에 저장하거나 integrations.json의 email.gmail.clientID/clientSecret을 설정하세요."
+        )
+    }
+
+    private static func defaultCandidateFiles(for configuration: GmailIntegrationConfiguration) -> [URL] {
+        var files: [URL] = []
+        if let configuredPath = configuration.clientSecretFile?.nilIfEmpty {
+            files.append(URL(fileURLWithPath: configuredPath.expandingTildeInPath))
+        }
+        files.append(IntegrationConfiguration.gmailClientSecretFileURL)
+        files.append(IntegrationConfiguration.googleCredentialsFileURL)
+        return files.removingDuplicatesByPath()
+    }
+}
+
 struct GmailOAuthService {
     private static let authEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
     private static let tokenEndpoint = URL(string: "https://oauth2.googleapis.com/token")!
@@ -8,20 +56,19 @@ struct GmailOAuthService {
     private let tokenStore = GmailTokenStore()
 
     func authorize(configuration: GmailIntegrationConfiguration) async throws {
-        let clientID = try required(configuration.clientID, name: "Gmail clientID")
-        let clientSecret = try required(configuration.clientSecret, name: "Gmail clientSecret")
+        let credentials = try GmailOAuthClientCredentials.resolve(configuration: configuration)
         let state = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         let loopbackServer = OAuthLoopbackServer(expectedState: state)
         let port = try await loopbackServer.start()
         let redirectURI = "http://127.0.0.1:\(port)"
-        let authURL = try authorizationURL(clientID: clientID, redirectURI: redirectURI, state: state)
+        let authURL = try authorizationURL(clientID: credentials.clientID, redirectURI: redirectURI, state: state)
 
         try openInBrowser(authURL)
         let code = try await waitForAuthorizationCode(from: loopbackServer)
         let token = try await exchangeAuthorizationCode(
             code,
-            clientID: clientID,
-            clientSecret: clientSecret,
+            clientID: credentials.clientID,
+            clientSecret: credentials.clientSecret,
             redirectURI: redirectURI
         )
         try tokenStore.save(token)
@@ -37,7 +84,7 @@ struct GmailOAuthService {
                 try await loopbackServer.waitForCode()
             }
             group.addTask {
-                try await Task.sleep(nanoseconds: 120 * 1_000_000_000)
+                try await Task.sleep(nanoseconds: 300 * 1_000_000_000)
                 throw ServiceClientError.serviceMessage("Gmail 로그인 시간이 초과되었습니다.")
             }
 
@@ -50,8 +97,7 @@ struct GmailOAuthService {
     }
 
     func accessToken(configuration: GmailIntegrationConfiguration) async throws -> String {
-        let clientID = try required(configuration.clientID, name: "Gmail clientID")
-        let clientSecret = try required(configuration.clientSecret, name: "Gmail clientSecret")
+        let credentials = try GmailOAuthClientCredentials.resolve(configuration: configuration)
         guard var token = try tokenStore.load() else {
             throw ServiceClientError.serviceMessage("Gmail 로그인이 필요합니다. Settings > Integrations에서 Gmail 로그인을 먼저 실행하세요.")
         }
@@ -60,16 +106,13 @@ struct GmailOAuthService {
             return token.accessToken
         }
 
-        token = try await refreshToken(token.refreshToken, clientID: clientID, clientSecret: clientSecret)
+        token = try await refreshToken(
+            token.refreshToken,
+            clientID: credentials.clientID,
+            clientSecret: credentials.clientSecret
+        )
         try tokenStore.save(token)
         return token.accessToken
-    }
-
-    private func required(_ value: String?, name: String) throws -> String {
-        guard let value = value?.nilIfEmpty else {
-            throw ServiceClientError.serviceMessage("\(name)이 integrations.json에 없습니다.")
-        }
-        return value
     }
 
     private func authorizationURL(clientID: String, redirectURI: String, state: String) throws -> URL {
@@ -175,6 +218,46 @@ private struct GmailTokenResponse: Decodable {
     }
 }
 
+private struct GoogleOAuthClientSecretDocument: Decodable {
+    var installed: GoogleOAuthClientSecret?
+    var web: GoogleOAuthClientSecret?
+    var google: GoogleOAuthClientSecret?
+    var clientID: String?
+    var clientSecret: String?
+
+    enum CodingKeys: String, CodingKey {
+        case installed
+        case web
+        case google
+        case clientID = "client_id"
+        case clientSecret = "client_secret"
+    }
+
+    var preferredClientSecret: GoogleOAuthClientSecret? {
+        if let installed {
+            return installed
+        }
+        if let google {
+            return google
+        }
+        if let clientID = clientID?.nilIfEmpty,
+           let clientSecret = clientSecret?.nilIfEmpty {
+            return GoogleOAuthClientSecret(clientID: clientID, clientSecret: clientSecret)
+        }
+        return nil
+    }
+}
+
+private struct GoogleOAuthClientSecret: Decodable {
+    var clientID: String
+    var clientSecret: String
+
+    enum CodingKeys: String, CodingKey {
+        case clientID = "client_id"
+        case clientSecret = "client_secret"
+    }
+}
+
 private struct GmailToken: Codable {
     var accessToken: String
     var refreshToken: String
@@ -273,12 +356,19 @@ private final class OAuthLoopbackServer: @unchecked Sendable {
             guard let self else { return }
             let request = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             let result = self.parseRequest(request)
-            self.respond(to: connection, success: result.isSuccess)
-            self.finish(result)
+            self.respond(to: connection, result: result)
+            switch result {
+            case let .success(code):
+                self.finish(.success(code))
+            case let .failure(error):
+                self.finish(.failure(error))
+            case .unrelated:
+                break
+            }
         }
     }
 
-    private func parseRequest(_ request: String) -> Result<String, Error> {
+    private func parseRequest(_ request: String) -> OAuthCallbackResult {
         guard let firstLine = request.components(separatedBy: .newlines).first else {
             return .failure(ServiceClientError.serviceMessage("OAuth callback 요청을 읽지 못했습니다."))
         }
@@ -297,6 +387,10 @@ private final class OAuthLoopbackServer: @unchecked Sendable {
             return .failure(ServiceClientError.serviceMessage("Gmail 로그인 거부: \(error)"))
         }
 
+        guard values["code"] != nil || values["state"] != nil else {
+            return .unrelated
+        }
+
         guard values["state"] == expectedState else {
             return .failure(ServiceClientError.serviceMessage("Gmail OAuth state가 일치하지 않습니다."))
         }
@@ -308,8 +402,15 @@ private final class OAuthLoopbackServer: @unchecked Sendable {
         return .success(code)
     }
 
-    private func respond(to connection: NWConnection, success: Bool) {
-        let message = success ? "Authorized - you can close this tab." : "Authorization failed - return to Suri."
+    private func respond(to connection: NWConnection, result: OAuthCallbackResult) {
+        let message = switch result {
+        case .success:
+            "Authorized - you can close this tab."
+        case .failure:
+            "Authorization failed - return to Suri."
+        case .unrelated:
+            "Waiting for Google authorization..."
+        }
         let body = "<!doctype html><meta charset=utf-8><body style=\"font-family:system-ui;padding:2rem\">\(message)</body>"
         let response = """
         HTTP/1.1 200 OK\r
@@ -343,6 +444,12 @@ private final class OAuthLoopbackServer: @unchecked Sendable {
     }
 }
 
+private enum OAuthCallbackResult {
+    case success(String)
+    case failure(Error)
+    case unrelated
+}
+
 private final class OneShotContinuation<T, Failure: Error>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<T, Failure>?
@@ -363,18 +470,18 @@ private final class OneShotContinuation<T, Failure: Error>: @unchecked Sendable 
     }
 }
 
-private extension Result {
-    var isSuccess: Bool {
-        if case .success = self {
-            return true
-        }
-        return false
-    }
-}
-
 private extension String {
     var urlFormEncoded: String {
         addingPercentEncoding(withAllowedCharacters: .urlFormAllowed) ?? self
+    }
+}
+
+private extension Array where Element == URL {
+    func removingDuplicatesByPath() -> [URL] {
+        var seen = Set<String>()
+        return filter { url in
+            seen.insert(url.path).inserted
+        }
     }
 }
 

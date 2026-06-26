@@ -1,12 +1,12 @@
 import Foundation
 
 struct IntegrationConfiguration: Codable {
-    var slack: SlackIntegrationConfiguration?
-    var gitLab: GitLabIntegrationConfiguration?
-    var github: GitHubIntegrationConfiguration?
-    var jira: JiraIntegrationConfiguration?
-    var email: EmailIntegrationConfiguration?
-    var notes: DirectoryIntegrationConfiguration?
+    var slack: SlackIntegrationConfiguration? = nil
+    var gitLab: GitLabIntegrationConfiguration? = nil
+    var github: GitHubIntegrationConfiguration? = nil
+    var jira: JiraIntegrationConfiguration? = nil
+    var email: EmailIntegrationConfiguration? = nil
+    var notes: DirectoryIntegrationConfiguration? = nil
 
     static var directoryURL: URL {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -15,6 +15,14 @@ struct IntegrationConfiguration: Codable {
 
     static var fileURL: URL {
         directoryURL.appendingPathComponent("integrations.json")
+    }
+
+    static var gmailClientSecretFileURL: URL {
+        directoryURL.appendingPathComponent("google-client-secret.json")
+    }
+
+    static var googleCredentialsFileURL: URL {
+        directoryURL.appendingPathComponent("credentials.json")
     }
 
     static func load() throws -> IntegrationConfiguration? {
@@ -26,11 +34,45 @@ struct IntegrationConfiguration: Codable {
         return try JSONDecoder().decode(IntegrationConfiguration.self, from: data)
     }
 
+    static func save(_ configuration: IntegrationConfiguration) throws {
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        let encodedData = try encoder.encode(configuration)
+        let encodedObject = try JSONSerialization.jsonObject(with: encodedData) as? [String: Any] ?? [:]
+        let existingObject = try existingJSONObject()
+        let mergedObject = mergingJSON(existingObject, with: encodedObject)
+        let data = try JSONSerialization.data(withJSONObject: mergedObject, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: fileURL, options: [.atomic])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    }
+
+    private static func existingJSONObject() throws -> [String: Any] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return [:]
+        }
+        let data = try Data(contentsOf: fileURL)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
+    private static func mergingJSON(_ existing: [String: Any], with updates: [String: Any]) -> [String: Any] {
+        var result = existing
+        for (key, value) in updates {
+            if let existingValue = result[key] as? [String: Any],
+               let updateValue = value as? [String: Any] {
+                result[key] = mergingJSON(existingValue, with: updateValue)
+            } else {
+                result[key] = value
+            }
+        }
+        return result
+    }
+
     static func writeSampleIfNeeded() throws -> URL {
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
         if !FileManager.default.fileExists(atPath: fileURL.path) {
             try sampleJSON.data(using: .utf8)?.write(to: fileURL, options: [.atomic])
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         }
 
         return fileURL
@@ -81,6 +123,7 @@ struct IntegrationConfiguration: Codable {
         "gmail": {
           "clientID": "",
           "clientSecret": "",
+          "clientSecretFile": "~/Library/Application Support/Suri/google-client-secret.json",
           "query": "in:inbox newer_than:7d",
           "count": 30
         }
@@ -157,10 +200,11 @@ enum EmailIntegrationMode: String, Codable {
 }
 
 struct GmailIntegrationConfiguration: Codable {
-    var clientID: String?
-    var clientSecret: String?
-    var query: String?
-    var count: Int?
+    var clientID: String? = nil
+    var clientSecret: String? = nil
+    var clientSecretFile: String? = nil
+    var query: String? = nil
+    var count: Int? = nil
 }
 
 struct DirectoryIntegrationConfiguration: Codable {
