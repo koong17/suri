@@ -73,6 +73,10 @@ struct SettingsView: View {
                         createSampleConfiguration()
                     }
 
+                    Button("설정 폴더 열기") {
+                        openConfigurationFolder()
+                    }
+
                     if let configStatusMessage {
                         Text(configStatusMessage)
                             .font(.caption)
@@ -88,9 +92,14 @@ struct SettingsView: View {
                     }
                     .disabled(isAuthorizingGmail)
 
-                    Text("email.mode를 gmail로 설정하고 Google OAuth Desktop clientID/clientSecret을 넣은 뒤 실행하세요.")
+                    Text("Google Cloud에서 받은 Desktop OAuth JSON을 아래 위치에 둔 뒤 로그인하세요. 완료되면 email.mode가 gmail로 저장됩니다.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Text(IntegrationConfiguration.gmailClientSecretFileURL.path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
 
                     if let gmailStatusMessage {
                         Text(gmailStatusMessage)
@@ -103,7 +112,7 @@ struct SettingsView: View {
                 Label("Integrations", systemImage: "key")
             }
         }
-        .frame(width: 560, height: 360)
+        .frame(width: 560, height: 420)
         .scenePadding()
     }
 
@@ -116,19 +125,52 @@ struct SettingsView: View {
         }
     }
 
+    private func openConfigurationFolder() {
+        do {
+            try FileManager.default.createDirectory(
+                at: IntegrationConfiguration.directoryURL,
+                withIntermediateDirectories: true
+            )
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [IntegrationConfiguration.directoryURL.path]
+            try process.run()
+            configStatusMessage = "설정 폴더를 열었습니다."
+        } catch {
+            configStatusMessage = "설정 폴더 열기 실패: \(error.localizedDescription)"
+        }
+    }
+
     private func authorizeGmail() {
         isAuthorizingGmail = true
         gmailStatusMessage = "브라우저에서 Google 로그인을 완료하세요."
 
         Task {
             do {
-                guard let configuration = try IntegrationConfiguration.load(),
-                      let gmail = configuration.email?.gmail else {
-                    throw ServiceClientError.serviceMessage("integrations.json에 email.gmail 설정이 없습니다.")
+                var configuration = try IntegrationConfiguration.load() ?? IntegrationConfiguration()
+                var email = configuration.email ?? EmailIntegrationConfiguration(
+                    enabled: true,
+                    mode: .gmail,
+                    directory: "~/Documents/SuriEmail",
+                    gmail: GmailIntegrationConfiguration()
+                )
+                var gmail = email.gmail ?? GmailIntegrationConfiguration()
+                if gmail.query?.nilIfEmpty == nil {
+                    gmail.query = "in:inbox newer_than:7d"
                 }
+                if gmail.count == nil {
+                    gmail.count = 30
+                }
+
                 try await GmailOAuthService().authorize(configuration: gmail)
+                email.enabled = true
+                email.mode = .gmail
+                email.gmail = gmail
+                configuration.email = email
+                try IntegrationConfiguration.save(configuration)
+
                 await MainActor.run {
-                    gmailStatusMessage = "Gmail 로그인 완료"
+                    gmailStatusMessage = "Gmail 로그인 완료. Email 소스가 Gmail 모드로 저장되었습니다."
                     isAuthorizingGmail = false
                 }
             } catch {
